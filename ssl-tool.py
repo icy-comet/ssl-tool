@@ -160,16 +160,20 @@ def install_ca(cert: Path) -> int:
 def install_parser_handler(parsed_args: Namespace) -> None:
     cert_type = parsed_args.cert_type
 
-    if cert_type.lower() == "ca":
-        path = Path(input("Path to the public CA Cert:")).resolve()
+    try:
+        if cert_type.lower() == "ca":
+            path = Path(input("Path to the public CA Cert:")).resolve()
 
-        if not path.exists() and path.name.endswith((".pem", ".crt")):
-            raise ValueError("Invalid path supplied.")
+            if not path.exists() and path.name.endswith((".pem", ".crt")):
+                raise ValueError("Invalid path supplied.")
 
-        c = install_ca(path)
+            c = install_ca(path)
 
-        if not c:
-            print("Couldn't install the CA Certificate.")
+            if not c:
+                print("Couldn't install the CA Certificate.")
+    except ValueError as e:
+        print(str(e))
+        return
 
     return
 
