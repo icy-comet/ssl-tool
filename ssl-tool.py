@@ -120,10 +120,9 @@ def install_ca(cert: Path) -> int:
             if "debian" in [os_data.get("ID"), os_data.get("ID_LIKE")]:
                 run(
                     ["cp", f"{cert}", f"/usr/local/share/ca-certificates/{cert.name}"],
-                    shell=True,
                     check=True,
                 )
-                run("update-ca-certificates", shell=True, check=True)
+                run("update-ca-certificates", check=True)
             elif "fedora" in [os_data.get("ID"), os_data.get("ID_LIKE")]:
                 run(
                     [
@@ -131,10 +130,9 @@ def install_ca(cert: Path) -> int:
                         f"{cert}",
                         f"/usr/share/pki/ca-trust-source/anchors/{cert.name}",
                     ],
-                    shell=True,
                     check=True,
                 )
-                run("update-ca-trust", shell=True, check=True)
+                run("update-ca-trust", check=True)
             else:
                 print(
                     "\nCouldn't identify your distribution. Kindly file an issue over at GitHub."
@@ -167,6 +165,7 @@ def install_parser_handler(parsed_args: Namespace) -> None:
             if not path.exists() and path.name.endswith((".pem", ".crt")):
                 raise ValueError("Invalid path supplied.")
 
+            print()
             c = install_ca(path)
 
             if not c:
@@ -225,79 +224,84 @@ def create_parser_handler(parsed_args: Namespace) -> None:
             print("\n(Should be a comma separated list.)")
             new_ssl_cert.alt_dns = input("DNS entries used to identify the subject:")
 
-            if not new_ssl_cert.key.exists():
-                # Create a new RSA key
+            # catch wrong passphrase
+            try:
+                if not new_ssl_cert.key.exists():
+                    # Create a new RSA key
+                    run(
+                        [
+                            "openssl",
+                            "genrsa",
+                            "-aes256",
+                            "-out",
+                            f"{new_ssl_cert.key}",
+                            "4096",
+                        ],
+                        check=True,
+                    )
+
+                # Create a Certificate Signing Request (CSR)
                 run(
                     [
                         "openssl",
-                        "genrsa",
-                        "-aes256",
-                        "-out",
+                        "req",
+                        "-subj",
+                        f"/CN={str(new_ssl_cert.common_name)}",
+                        "-sha256",
+                        "-new",
+                        "-key",
                         f"{new_ssl_cert.key}",
-                        "4096",
+                        "-out",
+                        f"{new_ssl_cert.key.parent + 'cert.csr'}",
                     ],
                     check=True,
                 )
 
-            # Create a Certificate Signing Request (CSR)
-            run(
-                [
-                    "openssl",
-                    "req",
-                    "-subj",
-                    f"/CN={str(new_ssl_cert.common_name)}",
-                    "-sha256",
-                    "-new",
-                    "-key",
-                    f"{new_ssl_cert.key}",
-                    "-out",
-                    f"{new_ssl_cert.key.parent + 'cert.csr'}",
-                ],
-                check=True,
-            )
+                if new_ssl_cert.alt_dns:
+                    dns_txt = ""
+                    for record in new_ssl_cert.alt_dns:
+                        dns_txt += f"DNS:{record},"
+                    if len(new_ssl_cert.alt_dns) < 2:
+                        dns_txt.rstrip(",")
+                if new_ssl_cert.alt_ips:
+                    ips_txt = ""
+                    for ip in new_ssl_cert.alt_ips:
+                        ips_txt += f"IP:{ip},"
+                    if len(new_ssl_cert.alt_ips) < 2:
+                        ips_txt.rstrip(",")
 
-            if new_ssl_cert.alt_dns:
-                dns_txt = ""
-                for record in new_ssl_cert.alt_dns:
-                    dns_txt += f"DNS:{record},"
-                if len(new_ssl_cert.alt_dns) < 2:
-                    dns_txt.rstrip(",")
-            if new_ssl_cert.alt_ips:
-                ips_txt = ""
-                for ip in new_ssl_cert.alt_ips:
-                    ips_txt += f"IP:{ip},"
-                if len(new_ssl_cert.alt_ips) < 2:
-                    ips_txt.rstrip(",")
+                tempf = TemporaryFile("w+", buffering=0, encoding="utf-8")
+                tempf.write("subjectAltName=" + dns_txt + ips_txt)
+                # ensure the data is written to the disk
+                fsync(tempf.fileno())
 
-            tempf = TemporaryFile("w+", buffering=0, encoding="utf-8")
-            tempf.write("subjectAltName=" + dns_txt + ips_txt)
-            # ensure the data is written to the disk
-            fsync(tempf.fileno())
 
-            # Create the Ceritificate
-            run(
-                [
-                    "openssl",
-                    "x509",
-                    "-req",
-                    "-days",
-                    "365",
-                    "-sha256",
-                    "-in",
-                    str(new_ssl_cert.key.parent + "cert.csr"),
-                    "-CA",
-                    f"{new_ssl_cert.ca_cert.key}",
-                    "-CAkey",
-                    f"{new_ssl_cert.ca_cert.key}",
-                    "-CAcreateserial",
-                    "-out",
-                    f"{new_ssl_cert.path}",
-                    "-extfile",
-                    f"{tempf.name}",
-                ],
-                shell=True,
-                check=True,
-            )
+                # Create the Ceritificate
+                run(
+                    [
+                        "openssl",
+                        "x509",
+                        "-req",
+                        "-days",
+                        "365",
+                        "-sha256",
+                        "-in",
+                        str(new_ssl_cert.key.parent + "cert.csr"),
+                        "-CA",
+                        f"{new_ssl_cert.ca_cert.key}",
+                        "-CAkey",
+                        f"{new_ssl_cert.ca_cert.key}",
+                        "-CAcreateserial",
+                        "-out",
+                        f"{new_ssl_cert.path}",
+                        "-extfile",
+                        f"{tempf.name}",
+                    ],
+                    check=True,
+                )
+            except CalledProcessError as e:
+                print("Wrong password provided.")
+                return
 
             print("\n==============================")
             print("New SSL certificate generated!")
@@ -315,29 +319,34 @@ def create_parser_handler(parsed_args: Namespace) -> None:
             # output formatting
             print()
 
-            run(
-                ["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"],
-                check=True,
-            )
+            # catch wrong passphrase
+            try:
+                run(
+                    ["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"],
+                    check=True
+                )
 
-            print("\nCreating the certificate...")
+                print("\nCreating the certificate...")
 
-            run(
-                [
-                    "openssl",
-                    "req",
-                    "-new",
-                    "-x509",
-                    "-days",
-                    "365",
-                    "-key",
-                    f"{new_ca_cert.key}",
-                    "-sha256",
-                    "-out",
-                    f"{new_ca_cert.path}",
-                ],
-                check=True,
-            )
+                run(
+                    [
+                        "openssl",
+                        "req",
+                        "-new",
+                        "-x509",
+                        "-days",
+                        "365",
+                        "-key",
+                        f"{new_ca_cert.key}",
+                        "-sha256",
+                        "-out",
+                        f"{new_ca_cert.path}",
+                    ],
+                    check=True,
+                )
+            except CalledProcessError as e:
+                print("Wrong passphrase provided.")
+                return
 
             print("\n==============================")
             print("New CA Certificate generated!")
@@ -372,6 +381,13 @@ create_parser.set_defaults(handler=create_parser_handler)
 install_parser = subparsers.add_parser("install", help="install a cert")
 install_parser.add_argument("cert_type", choices=["CA",], help="install a CA cert")
 install_parser.set_defaults(handler=install_parser_handler)
+
+# gets invoked if no sub-command is provided
+def defaults_handler(*args):
+    global parser
+    parser.print_help()
+
+parser.set_defaults(handler=defaults_handler)
 
 if __name__ == "__main__":
     parsed_args = parser.parse_args()
