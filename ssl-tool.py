@@ -155,6 +155,7 @@ def install_ca(cert: Path) -> int:
     print("=============================")
     return 1
 
+
 def install_parser_handler(parsed_args: Namespace) -> None:
     cert_type = parsed_args.cert_type
 
@@ -175,6 +176,7 @@ def install_parser_handler(parsed_args: Namespace) -> None:
         return
 
     return
+
 
 def create_parser_handler(parsed_args: Namespace) -> None:
     cert_type = parsed_args.cert_type
@@ -275,8 +277,7 @@ def create_parser_handler(parsed_args: Namespace) -> None:
                 # ensure the data is written to the disk
                 fsync(tempf.fileno())
 
-
-                # Create the Ceritificate
+                # Create the Certificate
                 run(
                     [
                         "openssl",
@@ -322,8 +323,15 @@ def create_parser_handler(parsed_args: Namespace) -> None:
             # catch wrong passphrase
             try:
                 run(
-                    ["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"],
-                    check=True
+                    [
+                        "openssl",
+                        "genrsa",
+                        "-aes256",
+                        "-out",
+                        f"{new_ca_cert.key}",
+                        "4096",
+                    ],
+                    check=True,
                 )
 
                 print("\nCreating the certificate...")
@@ -379,13 +387,18 @@ create_parser.add_argument(
 create_parser.set_defaults(handler=create_parser_handler)
 
 install_parser = subparsers.add_parser("install", help="install a cert")
-install_parser.add_argument("cert_type", choices=["CA",], help="install a CA cert")
+install_parser.add_argument(
+    "cert_type",
+    choices=["CA",],
+    help="install a CA cert",
+)
 install_parser.set_defaults(handler=install_parser_handler)
 
 # gets invoked if no sub-command is provided
 def defaults_handler(*args):
     global parser
     parser.print_help()
+
 
 parser.set_defaults(handler=defaults_handler)
 
