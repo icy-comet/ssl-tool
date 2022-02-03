@@ -1,8 +1,8 @@
-import os
-import sys
-import subprocess
+from sys import exit
+from os import fsync
 from typing import List
 from pathlib import Path
+from subprocess import run
 from signal import SIGINT, signal
 from tempfile import TemporaryFile
 from argparse import ArgumentParser, Namespace
@@ -10,7 +10,7 @@ from argparse import ArgumentParser, Namespace
 
 def sigint_handler(*args):
     print("\n\nExiting...")
-    sys.exit(0)
+    exit(0)
 
 
 # do not raise KeyboardInterrupt error on Ctrl+C
@@ -142,7 +142,7 @@ def cli_handler(parsed_args: Namespace) -> None:
 
             if not new_ssl_cert.key.exists():
                 # Create a new RSA key
-                subprocess.run(
+                run(
                     [
                         "openssl",
                         "genrsa",
@@ -155,7 +155,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                 )
 
             # Create a Certificate Signing Request (CSR)
-            subprocess.run(
+            run(
                 [
                     "openssl",
                     "req",
@@ -187,10 +187,10 @@ def cli_handler(parsed_args: Namespace) -> None:
             tempf = TemporaryFile("w+", buffering=0, encoding="utf-8")
             tempf.write("subjectAltName=" + dns_txt + ips_txt)
             # ensure the data is written to the disk
-            os.fsync(tempf.fileno())
+            fsync(tempf.fileno())
 
             # Create the Ceritificate
-            subprocess.run(
+            run(
                 [
                     "openssl",
                     "x509",
@@ -229,13 +229,11 @@ def cli_handler(parsed_args: Namespace) -> None:
             # output formatting
             print()
 
-            subprocess.run(
-                ["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"]
-            )
+            run(["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"])
 
             print("\nCreating the certificate...")
 
-            subprocess.run(
+            run(
                 [
                     "openssl",
                     "req",
@@ -264,7 +262,9 @@ parser = ArgumentParser(
 )
 
 parser.add_argument(
-    "cert_type", choices=["CA", "SSL"], help="create a CA cert or an individual SSL cert"
+    "cert_type",
+    choices=["CA", "SSL"],
+    help="create a CA cert or an individual SSL cert",
 )
 
 parser.set_defaults(handler=cli_handler)
