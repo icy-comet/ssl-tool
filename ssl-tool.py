@@ -4,7 +4,6 @@ from typing import List
 from pathlib import Path
 from platform import system
 from signal import SIGINT, signal
-from tempfile import TemporaryFile
 from argparse import ArgumentParser, Namespace
 from subprocess import run, CalledProcessError
 
@@ -254,28 +253,29 @@ def create_parser_handler(parsed_args: Namespace) -> None:
                         "-key",
                         f"{new_ssl_cert.key}",
                         "-out",
-                        f"{new_ssl_cert.key.parent + 'cert.csr'}",
+                        f"{new_ssl_cert.path.parent / 'cert.csr'}",
                     ],
                     check=True,
                 )
 
+                dns_txt = ""
                 if new_ssl_cert.alt_dns:
-                    dns_txt = ""
                     for record in new_ssl_cert.alt_dns:
                         dns_txt += f"DNS:{record},"
-                    if len(new_ssl_cert.alt_dns) < 2:
-                        dns_txt.rstrip(",")
+
+                ips_txt = ""
                 if new_ssl_cert.alt_ips:
-                    ips_txt = ""
                     for ip in new_ssl_cert.alt_ips:
                         ips_txt += f"IP:{ip},"
-                    if len(new_ssl_cert.alt_ips) < 2:
-                        ips_txt.rstrip(",")
+                    ips_txt = ips_txt.rstrip(",")
 
-                tempf = TemporaryFile("w+", buffering=0, encoding="utf-8")
-                tempf.write("subjectAltName=" + dns_txt + ips_txt)
-                # ensure the data is written to the disk
-                fsync(tempf.fileno())
+                # cannot use NamedTemporaryFile due to Windows limitations
+                extfile = new_ssl_cert.path.parent/"extfile.cnf"
+                with open(extfile, mode="w") as f:
+                    f.write("subjectAltName=" + dns_txt + ips_txt)
+                    f.flush()
+                    # ensure the data is written to the disk
+                    fsync(f.fileno())
 
                 # Create the Certificate
                 run(
@@ -287,16 +287,16 @@ def create_parser_handler(parsed_args: Namespace) -> None:
                         "365",
                         "-sha256",
                         "-in",
-                        str(new_ssl_cert.key.parent + "cert.csr"),
+                        str(new_ssl_cert.path.parent / "cert.csr"),
                         "-CA",
-                        f"{new_ssl_cert.ca_cert.key}",
+                        f"{new_ssl_cert.ca_cert.path}",
                         "-CAkey",
                         f"{new_ssl_cert.ca_cert.key}",
                         "-CAcreateserial",
                         "-out",
                         f"{new_ssl_cert.path}",
                         "-extfile",
-                        f"{tempf.name}",
+                        f"{extfile}",
                     ],
                     check=True,
                 )
