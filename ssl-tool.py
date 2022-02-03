@@ -2,7 +2,8 @@ from sys import exit
 from os import fsync
 from typing import List
 from pathlib import Path
-from subprocess import run
+from subprocess import run, CalledProcessError
+from platform import system
 from signal import SIGINT, signal
 from tempfile import TemporaryFile
 from argparse import ArgumentParser, Namespace
@@ -41,7 +42,11 @@ class CACert:
     def path(self, path: str) -> None:
         if path.endswith(".pem"):
             if path:
-                self._path = Path(path).resolve()
+                path = Path(path).resolve()
+                if path == self.key:
+                    raise ValueError("Key and Certificate path cannot be same.")
+                else:
+                    self._path = path
             else:
                 self._path = self._key.parent + "ssl_certificate.pem"
         else:
@@ -91,6 +96,42 @@ class SSLCert(CACert):
         else:
             pass
 
+def install_ca(cert: Path, key: Path) -> int:
+    os_type = system().lower()
+    if os_type == "linux":
+        # platform.freedesktop_os_release() is only available in Python 3.10+
+        try:
+            f = open("/etc/os-release", "r")
+        except FileNotFoundError:
+            f = open("/usr/lib/os-release", "r")
+        except:
+            print("Couldn't determine your OS.")
+            return 0
+
+        os_data = {key:val.strip("\n \"") for key,val in [line.split("=") for line in f]}
+        f.close()
+
+        try:
+            if "debian" in [os_data.get("ID"), os_data.get("ID_LIKE")]:
+                run(["cp", f"{cert}", f"/usr/local/share/ca-certificates/{cert.name}"], shell=True, check=True)
+                run("update-ca-certificates", shell=True, check=True)
+            elif "fedora" in [os_data.get("ID"), os_data.get("ID_LIKE")]:
+                run(["cp", f"{cert}", f"/usr/share/pki/ca-trust-source/anchors/{cert.name}"], shell=True, check=True)
+                run("update-ca-trust", shell=True, check=True)
+            else:
+                print("Couldn't identify your distribution. Kindly file an issue over at GitHub.")
+                return 0
+        except CalledProcessError:
+            print("Something went wrong with privileges.")
+            return 0
+    elif os_type == "windows":
+        try:
+            run(["certutil.exe", "-addstore", "root", f"{cert}"], shell=True, check=True)
+        except:
+            print("Something went wrong with privileges.")
+            return 0
+
+    return 1
 
 def cli_handler(parsed_args: Namespace) -> None:
     cert_type = parsed_args.cert_type
@@ -151,7 +192,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                         f"{new_ssl_cert.key}",
                         "4096",
                     ],
-                    shell=True,
+                    check=True
                 )
 
             # Create a Certificate Signing Request (CSR)
@@ -168,7 +209,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                     "-out",
                     f"{new_ssl_cert.key.parent + 'cert.csr'}",
                 ],
-                shell=True,
+                check=True
             )
 
             if new_ssl_cert.alt_dns:
@@ -211,6 +252,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                     f"{tempf.name}",
                 ],
                 shell=True,
+                check=True
             )
 
             print("\n==============================")
@@ -229,7 +271,7 @@ def cli_handler(parsed_args: Namespace) -> None:
             # output formatting
             print()
 
-            run(["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"])
+            run(["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"], check=True)
 
             print("\nCreating the certificate...")
 
@@ -246,16 +288,28 @@ def cli_handler(parsed_args: Namespace) -> None:
                     "-sha256",
                     "-out",
                     f"{new_ca_cert.path}",
-                ]
+                ],
+                check=True
             )
 
             print("\n==============================")
             print("New CA Certificate generated!")
             print("==============================")
+
+            auto_inst = input("Attempt auto-install of the CA certificate?[y/n]")
+
+            if auto_inst.lower() == "y":
+                c = install_ca(new_ca_cert.path, new_ca_cert.key)
+                if c:
+                    print("\n=============================")
+                    print("Installed the CA Certificate!")
+                    print("=============================")
+                else:
+                    print("Couldn't auto-install the CA certificate.")
             return
     except ValueError as e:
         print(str(e))
-
+        return
 
 parser = ArgumentParser(
     description="interactive CLI wrapper around openssl make self-signing SSL certs easy"

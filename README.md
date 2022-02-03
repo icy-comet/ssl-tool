@@ -15,7 +15,9 @@ Download the script and just run it.
 python ./ssl-tool.py --help
 ```
 
-The script eliminates the need to create a `extfile` manually.
+The script eliminates the need to create a `extfile` manually. It can even auto-install the CA certificate for you, if chosen.
+
+If you choose to auto-install the CA certificate, please note that escalated privileges are required for it. Windows users must run the script in a shell ran as administrator and Linux users must run the script with sudo or a similar privilege escalation tool. The script doesn't support auto-install for Macs yet.
 
 ## Contributing
 Pull requests, feature requests, and issues are always welcome.
@@ -59,7 +61,8 @@ The exact steps vary device-to-device.
 ```bash
 sudo update-ca-certificates
 ```
-Refer the documentation [here](https://wiki.debian.org/Self-Signed_Certificate) and [here.](https://manpages.debian.org/buster/ca-certificates/update-ca-certificates.8.en.html)
+- Filename should end in `.crt`. The `.pem` file this wrapper generates, can be directly renamed to `.crt` according to the internet.
+- Refer the documentation [here](https://wiki.debian.org/Self-Signed_Certificate) and [here.](https://manpages.debian.org/buster/ca-certificates/update-ca-certificates.8.en.html)
 
 ### On Fedora
 - Move the CA certificate to `/etc/pki/ca-trust/source/anchors/` or `/usr/share/pki/ca-trust-source/anchors/`
@@ -67,4 +70,5 @@ Refer the documentation [here](https://wiki.debian.org/Self-Signed_Certificate) 
 ```bash
 update-ca-trust
 ```
-Refer the documentation [here.](https://docs.fedoraproject.org/en-US/quick-docs/using-shared-system-certificates/)
+- `.pem` file can be used directly here.
+- Refer the documentation [here.](https://docs.fedoraproject.org/en-US/quick-docs/using-shared-system-certificates/)
