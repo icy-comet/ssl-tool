@@ -96,6 +96,7 @@ class SSLCert(CACert):
         else:
             pass
 
+
 def install_ca(cert: Path, key: Path) -> int:
     os_type = system().lower()
     if os_type == "linux":
@@ -108,30 +109,49 @@ def install_ca(cert: Path, key: Path) -> int:
             print("Couldn't determine your OS.")
             return 0
 
-        os_data = {key:val.strip("\n \"") for key,val in [line.split("=") for line in f]}
+        os_data = {
+            key: val.strip('\n "') for key, val in [line.split("=") for line in f]
+        }
         f.close()
 
         try:
             if "debian" in [os_data.get("ID"), os_data.get("ID_LIKE")]:
-                run(["cp", f"{cert}", f"/usr/local/share/ca-certificates/{cert.name}"], shell=True, check=True)
+                run(
+                    ["cp", f"{cert}", f"/usr/local/share/ca-certificates/{cert.name}"],
+                    shell=True,
+                    check=True,
+                )
                 run("update-ca-certificates", shell=True, check=True)
             elif "fedora" in [os_data.get("ID"), os_data.get("ID_LIKE")]:
-                run(["cp", f"{cert}", f"/usr/share/pki/ca-trust-source/anchors/{cert.name}"], shell=True, check=True)
+                run(
+                    [
+                        "cp",
+                        f"{cert}",
+                        f"/usr/share/pki/ca-trust-source/anchors/{cert.name}",
+                    ],
+                    shell=True,
+                    check=True,
+                )
                 run("update-ca-trust", shell=True, check=True)
             else:
-                print("Couldn't identify your distribution. Kindly file an issue over at GitHub.")
+                print(
+                    "Couldn't identify your distribution. Kindly file an issue over at GitHub."
+                )
                 return 0
         except CalledProcessError:
             print("Something went wrong with privileges.")
             return 0
     elif os_type == "windows":
         try:
-            run(["certutil.exe", "-addstore", "root", f"{cert}"], shell=True, check=True)
+            run(
+                ["certutil.exe", "-addstore", "root", f"{cert}"], shell=True, check=True
+            )
         except:
             print("Something went wrong with privileges.")
             return 0
 
     return 1
+
 
 def cli_handler(parsed_args: Namespace) -> None:
     cert_type = parsed_args.cert_type
@@ -192,7 +212,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                         f"{new_ssl_cert.key}",
                         "4096",
                     ],
-                    check=True
+                    check=True,
                 )
 
             # Create a Certificate Signing Request (CSR)
@@ -209,7 +229,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                     "-out",
                     f"{new_ssl_cert.key.parent + 'cert.csr'}",
                 ],
-                check=True
+                check=True,
             )
 
             if new_ssl_cert.alt_dns:
@@ -252,7 +272,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                     f"{tempf.name}",
                 ],
                 shell=True,
-                check=True
+                check=True,
             )
 
             print("\n==============================")
@@ -271,7 +291,10 @@ def cli_handler(parsed_args: Namespace) -> None:
             # output formatting
             print()
 
-            run(["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"], check=True)
+            run(
+                ["openssl", "genrsa", "-aes256", "-out", f"{new_ca_cert.key}", "4096"],
+                check=True,
+            )
 
             print("\nCreating the certificate...")
 
@@ -289,7 +312,7 @@ def cli_handler(parsed_args: Namespace) -> None:
                     "-out",
                     f"{new_ca_cert.path}",
                 ],
-                check=True
+                check=True,
             )
 
             print("\n==============================")
@@ -310,6 +333,7 @@ def cli_handler(parsed_args: Namespace) -> None:
     except ValueError as e:
         print(str(e))
         return
+
 
 parser = ArgumentParser(
     description="interactive CLI wrapper around openssl make self-signing SSL certs easy"
