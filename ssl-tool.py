@@ -233,7 +233,6 @@ def create_parser_handler(parsed_args: Namespace) -> None:
                         [
                             "openssl",
                             "genrsa",
-                            "-aes256",
                             "-out",
                             f"{new_ssl_cert.key}",
                             "4096",
@@ -270,7 +269,7 @@ def create_parser_handler(parsed_args: Namespace) -> None:
                     ips_txt = ips_txt.rstrip(",")
 
                 # cannot use NamedTemporaryFile due to Windows limitations
-                extfile = new_ssl_cert.path.parent/"extfile.cnf"
+                extfile = new_ssl_cert.path.parent / "extfile.cnf"
                 with open(extfile, mode="w") as f:
                     f.write("subjectAltName=" + dns_txt + ips_txt)
                     f.flush()
