@@ -2,11 +2,11 @@ from sys import exit
 from os import fsync
 from typing import List
 from pathlib import Path
-from subprocess import run, CalledProcessError
 from platform import system
 from signal import SIGINT, signal
 from tempfile import TemporaryFile
 from argparse import ArgumentParser, Namespace
+from subprocess import run, CalledProcessError
 
 
 def sigint_handler(*args):
@@ -97,16 +97,18 @@ class SSLCert(CACert):
             pass
 
 
-def install_ca(cert: Path, key: Path) -> int:
+def install_ca(cert: Path) -> int:
     os_type = system().lower()
     if os_type == "linux":
         # platform.freedesktop_os_release() is only available in Python 3.10+
+        # os-release Documentation:
+        # https://www.freedesktop.org/software/systemd/man/os-release.html
         try:
             f = open("/etc/os-release", "r")
         except FileNotFoundError:
             f = open("/usr/lib/os-release", "r")
         except:
-            print("Couldn't determine your OS.")
+            print("\nCouldn't determine your OS.")
             return 0
 
         os_data = {
@@ -135,11 +137,11 @@ def install_ca(cert: Path, key: Path) -> int:
                 run("update-ca-trust", shell=True, check=True)
             else:
                 print(
-                    "Couldn't identify your distribution. Kindly file an issue over at GitHub."
+                    "\nCouldn't identify your distribution. Kindly file an issue over at GitHub."
                 )
                 return 0
         except CalledProcessError:
-            print("Something went wrong with privileges.")
+            print("\nSomething went wrong with privileges.")
             return 0
     elif os_type == "windows":
         try:
@@ -147,13 +149,31 @@ def install_ca(cert: Path, key: Path) -> int:
                 ["certutil.exe", "-addstore", "root", f"{cert}"], shell=True, check=True
             )
         except:
-            print("Something went wrong with privileges.")
+            print("\nSomething went wrong with privileges.")
             return 0
 
+    print("\n=============================")
+    print("Installed the CA Certificate!")
+    print("=============================")
     return 1
 
+def install_parser_handler(parsed_args: Namespace) -> None:
+    cert_type = parsed_args.cert_type
 
-def cli_handler(parsed_args: Namespace) -> None:
+    if cert_type.lower() == "ca":
+        path = Path(input("Path to the public CA Cert:")).resolve()
+
+        if not path.exists() and path.name.endswith((".pem", ".crt")):
+            raise ValueError("Invalid path supplied.")
+
+        c = install_ca(path)
+
+        if not c:
+            print("Couldn't install the CA Certificate.")
+
+    return
+
+def create_parser_handler(parsed_args: Namespace) -> None:
     cert_type = parsed_args.cert_type
 
     print("\n==========")
@@ -186,7 +206,7 @@ def cli_handler(parsed_args: Namespace) -> None:
             new_ssl_cert.key = input("Path to the (new) key file:")
 
             print(
-                "\n(Should end in .pem extension. By default, the certificate will be created in the supplied key's directory.)"
+                "\n(Should end in .pem extension. By default, the certificate will be created in the same directory as the key's.)"
             )
             new_ssl_cert.path = input("Path to the new SSL certificate:")
 
@@ -319,15 +339,11 @@ def cli_handler(parsed_args: Namespace) -> None:
             print("New CA Certificate generated!")
             print("==============================")
 
-            auto_inst = input("Attempt auto-install of the CA certificate?[y/n]")
+            auto_inst = input("\nAttempt auto-install of the CA certificate?[y/n]")
 
             if auto_inst.lower() == "y":
-                c = install_ca(new_ca_cert.path, new_ca_cert.key)
-                if c:
-                    print("\n=============================")
-                    print("Installed the CA Certificate!")
-                    print("=============================")
-                else:
+                c = install_ca(new_ca_cert.path)
+                if not c:
                     print("Couldn't auto-install the CA certificate.")
             return
     except ValueError as e:
@@ -339,13 +355,19 @@ parser = ArgumentParser(
     description="interactive CLI wrapper around openssl make self-signing SSL certs easy"
 )
 
-parser.add_argument(
+subparsers = parser.add_subparsers(help="subcommands")
+
+create_parser = subparsers.add_parser("create", help="create a cert")
+create_parser.add_argument(
     "cert_type",
     choices=["CA", "SSL"],
     help="create a CA cert or an individual SSL cert",
 )
+create_parser.set_defaults(handler=create_parser_handler)
 
-parser.set_defaults(handler=cli_handler)
+install_parser = subparsers.add_parser("install", help="install a cert")
+install_parser.add_argument("cert_type", choices=["CA",], help="install a CA cert")
+install_parser.set_defaults(handler=install_parser_handler)
 
 if __name__ == "__main__":
     parsed_args = parser.parse_args()
