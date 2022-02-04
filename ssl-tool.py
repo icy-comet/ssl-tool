@@ -184,6 +184,8 @@ def create_parser_handler(parsed_args: Namespace) -> None:
     print("Starting...")
     print("===========")
 
+    print("\n(Relative paths to the current working directory work as well.)\n")
+
     try:
         if cert_type.lower() == "ssl":
             new_ssl_cert = SSLCert()
@@ -215,7 +217,7 @@ def create_parser_handler(parsed_args: Namespace) -> None:
             new_ssl_cert.path = input("Path to the new SSL certificate:")
 
             print(
-                "\nSubject Common Name is the value in the 'Issued to' field of the browser."
+                "\n(Subject Common Name is the value in the 'Issued to' field of the certificate.)"
             )
             new_ssl_cert.common_name = input("Subject Common Name for the certificate:")
 
@@ -333,7 +335,7 @@ def create_parser_handler(parsed_args: Namespace) -> None:
                     check=True,
                 )
 
-                print("\nCreating the certificate...")
+                print("\nCreating the certificate...\n")
 
                 run(
                     [
