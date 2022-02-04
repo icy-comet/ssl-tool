@@ -374,7 +374,7 @@ def create_parser_handler(parsed_args: Namespace) -> None:
 
 
 parser = ArgumentParser(
-    description="interactive CLI wrapper around openssl make self-signing SSL certs easy"
+    description="interactive CLI wrapper around openssl to make self-signing SSL certs easy"
 )
 
 subparsers = parser.add_subparsers(help="subcommands")

@@ -15,16 +15,52 @@ Download the script and just run it.
 python ./ssl-tool.py --help
 ```
 
-The script eliminates the need to create a `extfile` manually. It can even auto-install the CA certificate for you, if chosen.
+```
+usage: ssl-tool.py [-h] {create,install} ...
+
+interactive CLI wrapper around openssl to make self-signing SSL certs easy
+
+positional arguments:
+  {create,install}  subcommands
+    create          create a cert
+    install         install a cert
+
+options:
+  -h, --help        show this help message and exit
+```
+
+```
+usage: ssl-tool.py create [-h] {CA,SSL}
+
+positional arguments:
+  {CA,SSL}    create a CA cert or an individual SSL cert
+
+options:
+  -h, --help  show this help message and exit
+```
+
+```
+usage: ssl-tool.py install [-h] {CA}
+
+positional arguments:
+  {CA}        install a CA cert
+
+options:
+  -h, --help  show this help message and exit
+```
+
+The script eliminates the need to create a `extfile` manually. And can even auto-install the CA certificate for you.
 
 If you choose to auto-install the CA certificate, please note that escalated privileges are required for it. Windows users must run the script in a shell ran as administrator and Linux users must run the script with sudo or a similar privilege escalation tool. The script doesn't support auto-install for Macs yet.
+
+The script has been currently tested on Windows 10, Windows 11, Ubuntu 20.04 and Debian 11.
 
 ## Contributing
 Pull requests, feature requests, and issues are always welcome.
 
 ## Install the CA Certificate
 
-To trust the SSL certificates created with this tool, the root CA certificate must be installed beforehand.
+To trust the SSL certificates created with this tool, the root CA certificate must be installed beforehand. In case you want/need to do it manually:
 
 ### On Windows
 
