@@ -2,3 +2,4 @@
 *.cnf
 *.csr
 test*
+*.srl
