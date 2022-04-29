@@ -361,7 +361,7 @@ def create_parser_handler(parsed_args: Namespace) -> None:
             print("New CA Certificate generated!")
             print("==============================")
 
-            auto_inst = input("\nAttempt auto-install of the CA certificate?[y/n]")
+            auto_inst = input("\nAttempt auto-install of the CA certificate?[y/N]")
 
             if auto_inst.lower() == "y":
                 c = install_ca(new_ca_cert.path)
